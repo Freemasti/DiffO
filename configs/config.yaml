@@ -1,0 +1,227 @@
+
+
+
+
+
+model:
+  target: models.unet.UNetModelSwin
+  ckpt_path: 
+  params:
+    image_size: 64
+    in_channels: 320
+    model_channels: 160
+    out_channels: 256
+    cond_lq: True
+    attention_resolutions: [64,32,16,8]
+    dropout: 0
+    channel_mult: [1, 2, 2,4]
+    num_res_blocks: [2, 2, 2, 2]
+    conv_resample: True
+    dims: 2
+    use_fp16: False
+    num_head_channels: 32
+    use_scale_shift_norm: True
+    resblock_updown: False
+    swin_depth: 2
+    swin_embed_dim: 192
+    window_size: 4
+    final_window_size: 2
+    mlp_ratio: 4
+
+diffusion:
+  target: models.script_util.create_gaussian_diffusion
+  params:
+    sf: 1
+    schedule_name: exponential
+    schedule_kwargs:
+      power: 0.3
+    etas_end: 0.8
+    steps: 2
+    min_noise_level: 0.04
+    kappa: 2.0
+    weighted_mse: false
+    predict_type: xstart
+    timestep_respacing: null
+    scale_factor: 1.0
+    normalize_input: true
+    latent_flag: true
+
+
+
+autoencoder:
+  target: ldm.models.autoencoder.EMAVQModelTorch
+  ckpt_path: 
+  gt_encoder_ckpt_path: 
+  use_fp16: False
+  params:
+    embed_dim: 256
+    n_embed: 256
+    ddconfig:
+      double_z: False
+      z_channels: 256
+      resolution: 16
+      in_channels: 256
+      out_ch: 256
+      ch: 128 #128
+      ch_mult:
+      - 4
+      num_res_blocks: 2
+
+      attn_resolutions: [16]
+      dropout: 0.0
+      padding_mode: zeros
+      
+GT_encoder:
+  target: taming.models.vqgan.VQModel 
+  ckpt_path: 
+  use_fp16: False
+  params:
+    embed_dim: 256
+    n_embed: 16384
+    ddconfig:
+      double_z: False
+      z_channels: 256
+      resolution: 256
+      in_channels: 3
+      out_ch: 3
+      ch: 128 #128
+      ch_mult:
+      - 1
+      - 1 
+      - 2
+      - 2
+      - 4
+      num_res_blocks: 2
+      attn_resolutions: [16]
+      dropout: 0.0
+      padding_mode: zeros
+    lossconfig:
+      target: taming.modules.losses.vqperceptual.VQLPIPSWithDiscriminator
+      params:
+        disc_conditional: false
+        disc_in_channels: 3
+        disc_start: 0
+        disc_weight: 0.75
+        disc_num_layers: 2
+        codebook_weight: 1.0
+
+degradation:
+  sf: 1 # scale factor
+  LIC_model : #'cheng2020_anchor' # 'cheng2020_anchor from compress ai'
+  LIC_quality: 1 # range of LIC quality (cheng2020_anchor)
+
+  ########### Dismiss below settings
+  resize_prob: [0.0, 0.0, 1.0]  # up, down, keep # [0.2, 0.7, 0.1]
+  resize_range: [0.15, 1.5]
+  gaussian_noise_prob: 0.0 # 0.5
+  noise_range: [1, 30]
+  poisson_scale_range: [0.05, 3.0]
+  gray_noise_prob: 0.0 # 0.4
+  jpeg_range: [30, 95]
+
+  second_order_prob: 0.0 # 0.5
+  second_blur_prob: 0.8
+  resize_prob2: [0.3, 0.4, 0.3]  # up, down, keep
+  resize_range2: [0.3, 1.2]
+  gaussian_noise_prob2: 0.5
+  noise_range2: [1, 25]
+  poisson_scale_range2: [0.05, 2.5]
+  gray_noise_prob2: 0.4
+  jpeg_range2: [30, 95]
+  ############
+
+  gt_size: 256 
+  resize_back: False
+  use_sharp: False
+
+data:
+  train:
+    type: realesrgan
+    params:
+      dir_paths: []
+      txt_file_path: [
+                      'traindata/ImageNet2012.txt'
+                     ] 
+      im_exts: ['JPEG', ]
+      io_backend:
+        type: disk
+        
+      ############## Dismiss below settings
+      blur_kernel_size: 21
+      kernel_list: ['iso', 'aniso', 'generalized_iso', 'generalized_aniso', 'plateau_iso', 'plateau_aniso']
+      kernel_prob: [0.45, 0.25, 0.12, 0.03, 0.12, 0.03]
+      sinc_prob: 0.1
+      blur_sigma: [0.2, 3.0]
+      betag_range: [0.5, 4.0]
+      betap_range: [1, 2.0]
+
+      blur_kernel_size2: 15
+      kernel_list2: ['iso', 'aniso', 'generalized_iso', 'generalized_aniso', 'plateau_iso', 'plateau_aniso']
+      kernel_prob2: [0.45, 0.25, 0.12, 0.03, 0.12, 0.03]
+      sinc_prob2: 0.1
+      blur_sigma2: [0.2, 1.5]
+      betag_range2: [0.5, 4.0]
+      betap_range2: [1, 2.0]
+
+      final_sinc_prob: 0.8
+      ##############
+
+      gt_size: 256
+      crop_pad_size: 300
+      use_hflip: True
+      use_rot: False
+      rescale_gt: True
+  val:
+    type: folder
+    params:
+      dir_path: /testdata/
+      dir_path_extra: ~
+      transform_type: default
+      transform_kwargs:
+          mean: 0.5
+          std: 0.5
+      im_exts: png
+      length: ~
+      recursive: False
+
+train:
+  lr: 5.0e-05
+  batch:
+  - 8
+  - 8
+  train_model: true
+  add_noise_to_condition: false
+  encode_lq: true
+  only_use_yhat: false
+  resshift: true
+  train_autoencoder: true
+  train_GT_encoder: false
+  distortion_weight: 0.8
+  perceptual_weight: 0.2
+  loss_in_image_space: true
+  train_hyp_dec: false
+  use_fp16: false
+  microbatch: 4
+  seed: 123456
+  global_seeding: false
+  prefetch_factor: 8
+  num_workers: 8
+  ema_rate: 0.999
+  iterations: 500000
+  milestones:
+  - 2000
+  - 4000
+  - 10000
+  - 20000
+  - 30000
+  - 40000
+  - 500000
+  weight_decay: 0
+  save_freq: 2000
+  val_freq: 400
+  log_freq:
+  - 200
+  - 500000
+  - 1
+  save_images: true
+  use_ema_val: true
