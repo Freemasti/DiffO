@@ -4,7 +4,7 @@
 ### [[Paper(arxiv)](https://arxiv.org/abs/2506.16572)]
 
 ## Method Overview
-![Kodak](./asset/Kodak_qualit.pdf)
+![Kodak](./assets/Kodak_qualit.png)
 
 The proposed codec encodes images into a latent representation and reconstructs them with a single diffusion denoising step, enabling ultra-low-bitrate operation with fast decoding. The core design uses VQ-Residual training to factorize the latent into a structural base code (capturing global geometry/structure) and a learned residual (capturing high-frequency details), providing a stable scaffold while restoring fine textures. During decoding, rate-aware noise modulation sets the denoising strength according to the target bitrate (bpp)—stronger at lower bpp and milder at higher bpp. With the bitrate-conditioned noise level fixed, the decoder performs one denoising pass, eliminating multi-step overhead while preserving perceptual quality at extremely low bpp. This design achieves compression performance comparable to state-of-the-art methods and delivers ~50× faster decoding than multi-step diffusion codecs, substantially improving the practicality of generative compression.
 
